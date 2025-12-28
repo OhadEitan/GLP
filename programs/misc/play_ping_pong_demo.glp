@@ -10,6 +10,10 @@ merge(Xs, [Y|Ys], [Y?|Zs?]) :- merge(Xs?, Ys?, Zs).
 merge([], Ys?, Ys).
 merge(Xs?, [], Xs).
 
+%% Collect output stream into a list
+collect(ch([], Out?), Out).
+collect(ch([X|Xs], Out?), [X?|Rest?]) :- collect(ch(Xs?, Out), Rest).
+
 %% === Network switch (2-way) ===
 %% Routes msg(From, To, Content) based on To field
 
