@@ -42,8 +42,8 @@ agent(_, ch([], []), ch([], [])).
 
 %% === Actors ===
 
-%% Alice: sends ping command
-alice_actor(_, [send(bob, ping)]).
+%% Alice: sends ping command with counter N
+alice_actor(N, [send(bob, ping(N?))]).
 
 %% Bob: no user input
 bob_actor(_, []).
