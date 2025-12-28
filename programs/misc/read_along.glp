@@ -12,6 +12,11 @@ read_dream_word(I, Word) :-
     dream_speech(WordList),
     read_word(I?, WordList?, Word?).
 
+%% Maximum word index - computed from dream_speech length
+%% This is derived from the 33 words in dream_speech
+%% Change dream_speech => update this value
+max_word_index(33).
+
 %% === Dream Speech Stream ===
 
 dream_speech([i, have, a, dream, that, one, day, this, nation, will, rise, up, live,
@@ -50,15 +55,19 @@ alice_agent(ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
 
 alice_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
             ch([msg(From, To, read_word(I))|NetIn], [msg(alice, From?, read_word(I1?))|NetOut?])) :-
-    ground(From?), ground(To?), ground(I?), To? =?= alice, I? < 33 |
+    ground(From?), ground(To?), ground(I?), To? =?= alice,
+    max_word_index(MaxLen),
+    I? < MaxLen? |
     read_dream_word(I?, Word),
     I1 := I? + 1,
     alice_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-alice_agent(ch(UserIn, [read(33, Word?)|UserOut?]),
-            ch([msg(From, To, read_word(33))|NetIn], NetOut?)) :-
-    ground(From?), ground(To?), To? =?= alice |
-    read_dream_word(33, Word),
+alice_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
+            ch([msg(From, To, read_word(I))|NetIn], NetOut?)) :-
+    ground(From?), ground(To?), ground(I?), To? =?= alice,
+    max_word_index(MaxLen),
+    I? =:= MaxLen? |
+    read_dream_word(I?, Word),
     alice_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 alice_agent(ch([], []), ch([], [])).
@@ -72,15 +81,19 @@ bob_agent(ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
 
 bob_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
           ch([msg(From, To, read_word(I))|NetIn], [msg(bob, From?, read_word(I1?))|NetOut?])) :-
-    ground(From?), ground(To?), ground(I?), To? =?= bob, I? < 33 |
+    ground(From?), ground(To?), ground(I?), To? =?= bob,
+    max_word_index(MaxLen),
+    I? < MaxLen? |
     read_dream_word(I?, Word),
     I1 := I? + 1,
     bob_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-bob_agent(ch(UserIn, [read(33, Word?)|UserOut?]),
-          ch([msg(From, To, read_word(33))|NetIn], NetOut?)) :-
-    ground(From?), ground(To?), To? =?= bob |
-    read_dream_word(33, Word),
+bob_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
+          ch([msg(From, To, read_word(I))|NetIn], NetOut?)) :-
+    ground(From?), ground(To?), ground(I?), To? =?= bob,
+    max_word_index(MaxLen),
+    I? =:= MaxLen? |
+    read_dream_word(I?, Word),
     bob_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 bob_agent(ch([], []), ch([], [])).
