@@ -51,14 +51,14 @@ agent(_, ch([], []), ch([], [])).
 %% === Actors ===
 
 %% Alice: sends ping command with counter N
-alice_actor(N, [send(bob, ping(N?))]).
+alice_actor(_, N, [send(bob, ping(N?))]).
 
 %% Bob: no user input
 bob_actor(_, []).
 
 %% === The Play ===
 
-play_ping_pong :-
+play_ping_pong(N) :-
     %% Network switch
     network2((alice, ch(AliceNetOut?, AliceNetIn)),
              (bob, ch(BobNetOut?, BobNetIn))),
@@ -70,10 +70,10 @@ play_ping_pong :-
     agent(bob, ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
 
     %% Actors
-    alice_actor(AliceUserOut?, AliceUserIn),
+    alice_actor(AliceUserOut?, N?, AliceUserIn),
     bob_actor(BobUserOut?, BobUserIn).
 
 %% === Demo ===
 %% Run with :trace to see the ping-pong exchange
 
-demo :- play_ping_pong.
+demo :- play_ping_pong(3).
