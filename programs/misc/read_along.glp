@@ -55,17 +55,21 @@ agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Receive read_word(I) - read word I, send read_word(I+1) if I < 33
-agent(Id, ch(UserIn, [read(I?, word)|UserOut?]),
+agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
           ch([msg(From, To, read_word(I))|NetIn], [msg(Id?, From?, read_word(I1?))|NetOut?])) :-
     ground(Id?), ground(From?), ground(To?), ground(I?),
     Id? =?= To?, I? < 33 |
+    dream_speech(DreamWords),
+    read_word(I?, DreamWords?, Word),
     I1 := I? + 1,
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Receive read_word(33) - read last word, done
-agent(Id, ch(UserIn, [read(33, word)|UserOut?]),
+agent(Id, ch(UserIn, [read(33, Word?)|UserOut?]),
           ch([msg(From, To, read_word(33))|NetIn], NetOut?)) :-
     ground(Id?), ground(From?), ground(To?), Id? =?= To? |
+    dream_speech(DreamWords),
+    read_word(33, DreamWords?, Word),
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Empty inputs - close outputs
