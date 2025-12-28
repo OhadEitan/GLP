@@ -10,14 +10,6 @@ merge(Xs, [Y|Ys], [Y?|Zs?]) :- merge(Xs?, Ys?, Zs).
 merge([], Ys?, Ys).
 merge(Xs?, [], Xs).
 
-%% Duplicate stream into two identical copies
-duplicate([], [], []).
-duplicate([X|Xs], [X?|Ys?], [X?|Zs?]) :- duplicate(Xs?, Ys, Zs).
-
-%% Collect output stream into a list
-collect(ch([], Out?), Out).
-collect(ch([X|Xs], Out?), [X?|Rest?]) :- collect(ch(Xs?, Out), Rest).
-
 %% === Network switch (2-way) ===
 %% Routes msg(From, To, Content) based on To field
 
@@ -80,27 +72,7 @@ play_ping_pong :-
     alice_actor(AliceUserOut?, AliceUserIn),
     bob_actor(BobUserOut?, BobUserIn).
 
-%% === Demo with visible outputs ===
+%% === Demo ===
+%% Run with :trace to see the ping-pong exchange
 
-demo :-
-    %% Network switch
-    network2((alice, ch(AliceNetOut?, AliceNetIn)),
-             (bob, ch(BobNetOut?, BobNetIn))),
-
-    %% Alice's agent
-    agent(alice, ch(AliceUserIn?, AliceUserOutOrig), ch(AliceNetIn?, AliceNetOut)),
-
-    %% Bob's agent
-    agent(bob, ch(BobUserIn?, BobUserOutOrig), ch(BobNetIn?, BobNetOut)),
-
-    %% Duplicate outputs - one copy for actors, one copy for logging
-    duplicate(AliceUserOutOrig?, AliceUserOut, AliceLog),
-    duplicate(BobUserOutOrig?, BobUserOut, BobLog),
-
-    %% Actors (consume first copy)
-    alice_actor(AliceUserOut?, AliceUserIn),
-    bob_actor(BobUserOut?, BobUserIn),
-
-    %% Collect logs (consume second copy)
-    collect(ch(AliceLog?, AliceResult)),
-    collect(ch(BobLog?, BobResult)).
+demo :- play_ping_pong.
