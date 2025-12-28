@@ -1,0 +1,82 @@
+%% read_along.glp - Read-along with ping-pong agents
+
+%% === Read Word Predicate ===
+%% Reads the Nth word from a list (1-indexed)
+
+read_word(1, [Word|_], Word?).
+read_word(N, [_|Rest], Word?) :- N? > 1 | N1 := N? - 1, read_word(N1?, Rest?, Word).
+
+%% === Network switch (2-way) ===
+%% Routes msg(From, To, Content) based on To field
+
+network2((alice, ch([msg(alice, bob, X)|AliceIn], AliceOut?)),
+         (bob, ch(BobIn, [msg(alice, bob, X?)|BobOut?]))) :-
+    network2((alice, ch(AliceIn?, AliceOut)),
+             (bob, ch(BobIn?, BobOut))).
+
+network2((alice, ch(AliceIn, [msg(bob, alice, X?)|AliceOut?])),
+         (bob, ch([msg(bob, alice, X)|BobIn], BobOut?))) :-
+    network2((alice, ch(AliceIn?, AliceOut)),
+             (bob, ch(BobIn?, BobOut))).
+
+%% === Simple Ping-Pong Agent ===
+%% Process one message at a time using structure patterns in head
+
+%% User sends a message - forward to network
+agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
+          ch(NetIn, [msg(Id?, To?, Content?)|NetOut?])) :-
+    ground(Id?), ground(To?), ground(Content?) |
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+%% Receive ping(N) from network - reply with pong(N)
+agent(Id, ch(UserIn, [received_ping(From?, N?)|UserOut?]),
+          ch([msg(From, To, ping(N))|NetIn], [msg(Id?, From?, pong(N?))|NetOut?])) :-
+    ground(Id?), ground(From?), ground(To?), ground(N?), Id? =?= To? |
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+%% Receive pong(N) where N > 0 - send another ping(N-1)
+agent(Id, ch(UserIn, [received_pong(From?, N?)|UserOut?]),
+          ch([msg(From, To, pong(N))|NetIn], [msg(Id?, From?, ping(N1?))|NetOut?])) :-
+    ground(Id?), ground(From?), ground(To?), ground(N?),
+    Id? =?= To?, N? > 0 |
+    N1 := N? - 1,
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+%% Receive pong(0) - done, no more pings
+agent(Id, ch(UserIn, [received_pong(From?, 0)|UserOut?]),
+          ch([msg(From, To, pong(0))|NetIn], NetOut?)) :-
+    ground(Id?), ground(From?), ground(To?), Id? =?= To? |
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+%% Empty inputs - close outputs
+agent(_, ch([], []), ch([], [])).
+
+%% === Actors ===
+
+%% Alice: sends ping command with counter N
+alice_actor(_, N, [send(bob, ping(N?))]).
+
+%% Bob: no user input
+bob_actor(_, []).
+
+%% === The Play ===
+
+play_ping_pong(N) :-
+    %% Network switch
+    network2((alice, ch(AliceNetOut?, AliceNetIn)),
+             (bob, ch(BobNetOut?, BobNetIn))),
+
+    %% Alice's agent
+    agent(alice, ch(AliceUserIn?, AliceUserOut), ch(AliceNetIn?, AliceNetOut)),
+
+    %% Bob's agent
+    agent(bob, ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
+
+    %% Actors
+    alice_actor(AliceUserOut?, N?, AliceUserIn),
+    bob_actor(BobUserOut?, BobUserIn).
+
+%% === Demo ===
+%% Run with :trace to see the ping-pong exchange
+
+demo :- play_ping_pong(3).
