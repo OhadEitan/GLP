@@ -61,7 +61,7 @@ bob_actor(_, []).
 
 %% === The Play ===
 
-play_ping_pong :-
+play_ping_pong(AliceLog, BobLog) :-
     %% Network switch
     network2((alice, ch(AliceNetOut?, AliceNetIn)),
              (bob, ch(BobNetOut?, BobNetIn))),
@@ -74,4 +74,8 @@ play_ping_pong :-
 
     %% Actors
     alice_actor(AliceUserOut?, AliceUserIn),
-    bob_actor(BobUserOut?, BobUserIn).
+    bob_actor(BobUserOut?, BobUserIn),
+
+    %% Collect outputs
+    collect(AliceUserOut, AliceLog),
+    collect(BobUserOut, BobLog).
