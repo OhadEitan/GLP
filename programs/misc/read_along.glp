@@ -19,19 +19,6 @@ length([_|Xs], N?) :- length(Xs?, N1), N := N1? + 1.
 %% Identity predicate to consume values
 id(_).
 
-%% Test reading specific words from dream speech
-test_word_1 :- dream_speech(Words), read_word(1, Words?, W), id(W?).
-test_word_5 :- dream_speech(Words), read_word(5, Words?, W), id(W?).
-test_word_10 :- dream_speech(Words), read_word(10, Words?, W), id(W?).
-test_word_20 :- dream_speech(Words), read_word(20, Words?, W), id(W?).
-test_word_32 :- dream_speech(Words), read_word(32, Words?, W), id(W?).
-
-%% Demo: get dream speech length
-demo_length :-
-    dream_speech(Words),
-    length(Words?, Len),
-    id(Len?).
-
 %% === Network switch (2-way) ===
 %% Routes msg(From, To, Content) based on To field
 
@@ -54,22 +41,25 @@ agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
     ground(Id?), ground(To?), ground(Content?) |
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-%% Receive read_word(I) - read word I, send read_word(I+1) if I < 33
+%% Receive read_word(I) - read word I, send read_word(I+1) if I < MaxLen
 agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
           ch([msg(From, To, read_word(I))|NetIn], [msg(Id?, From?, read_word(I1?))|NetOut?])) :-
-    ground(Id?), ground(From?), ground(To?), ground(I?),
-    Id? =?= To?, I? < 33 |
+    ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To? |
     dream_speech(DreamWords),
+    length(DreamWords?, MaxLen),
     read_word(I?, DreamWords?, Word),
     I1 := I? + 1,
+    I1? =< MaxLen?,
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-%% Receive read_word(33) - read last word, done
-agent(Id, ch(UserIn, [read(33, Word?)|UserOut?]),
-          ch([msg(From, To, read_word(33))|NetIn], NetOut?)) :-
-    ground(Id?), ground(From?), ground(To?), Id? =?= To? |
+%% Receive read_word(I) where I = MaxLen - last word, done
+agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
+          ch([msg(From, To, read_word(I))|NetIn], NetOut?)) :-
+    ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To? |
     dream_speech(DreamWords),
-    read_word(33, DreamWords?, Word),
+    length(DreamWords?, MaxLen),
+    I? =:= MaxLen?,
+    read_word(I?, DreamWords?, Word),
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Empty inputs - close outputs
