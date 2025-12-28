@@ -6,6 +6,12 @@
 read_word(1, [Word|_], Word?).
 read_word(N, [_|Rest], Word?) :- N? > 1 | N1 := N? - 1, read_word(N1?, Rest?, Word).
 
+%% Helper: Read word I from dream speech
+%% This avoids SRSW violations by encapsulating dream_speech call
+read_dream_word(I, Word) :-
+    dream_speech(WordList),
+    read_word(I?, WordList?, Word?).
+
 %% === Dream Speech Stream ===
 
 dream_speech([i, have, a, dream, that, one, day, this, nation, will, rise, up, live,
@@ -33,35 +39,51 @@ network2((alice, ch(AliceIn, [msg(bob, alice, X?)|AliceOut?])),
              (bob, ch(BobIn?, BobOut))).
 
 %% === Read-Along Agent ===
-%% Agents take turns reading words from dream speech
+%% Alice and Bob agents - each calls read_dream_word to get words
 
-%% User sends a message - forward to network
-agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
-          ch(NetIn, [msg(Id?, To?, Content?)|NetOut?])) :-
-    ground(Id?), ground(To?), ground(Content?) |
-    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+%% === Alice's Agent ===
 
-%% Receive read_word(I) - read word I, send read_word(I+1) if I < 33
-agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
-          ch([msg(From, To, read_word(I))|NetIn], [msg(Id?, From?, read_word(I1?))|NetOut?])) :-
-    ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?, I? < 33 |
-    read_word(I?, [i, have, a, dream, that, one, day, this, nation, will, rise, up, live,
-                   out, the, true, meaning, of, its, creed, we, hold, these, truths, to, be,
-                   self_evident, that, all, men, are, created, equal], Word),
+alice_agent(ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
+            ch(NetIn, [msg(alice, To?, Content?)|NetOut?])) :-
+    ground(To?), ground(Content?) |
+    alice_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+alice_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
+            ch([msg(From, To, read_word(I))|NetIn], [msg(alice, From?, read_word(I1?))|NetOut?])) :-
+    ground(From?), ground(To?), ground(I?), To? =?= alice, I? < 33 |
+    read_dream_word(I?, Word),
     I1 := I? + 1,
-    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+    alice_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-%% Receive read_word(I) where I = MaxLen - last word, done
-agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
-          ch([msg(From, To, read_word(I))|NetIn], NetOut?)) :-
-    ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?, I? =:= 33 |
-    read_word(I?, [i, have, a, dream, that, one, day, this, nation, will, rise, up, live,
-                   out, the, true, meaning, of, its, creed, we, hold, these, truths, to, be,
-                   self_evident, that, all, men, are, created, equal], Word),
-    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+alice_agent(ch(UserIn, [read(33, Word?)|UserOut?]),
+            ch([msg(From, To, read_word(33))|NetIn], NetOut?)) :-
+    ground(From?), ground(To?), To? =?= alice |
+    read_dream_word(33, Word),
+    alice_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-%% Empty inputs - close outputs
-agent(_, ch([], []), ch([], [])).
+alice_agent(ch([], []), ch([], [])).
+
+%% === Bob's Agent ===
+
+bob_agent(ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
+          ch(NetIn, [msg(bob, To?, Content?)|NetOut?])) :-
+    ground(To?), ground(Content?) |
+    bob_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+bob_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
+          ch([msg(From, To, read_word(I))|NetIn], [msg(bob, From?, read_word(I1?))|NetOut?])) :-
+    ground(From?), ground(To?), ground(I?), To? =?= bob, I? < 33 |
+    read_dream_word(I?, Word),
+    I1 := I? + 1,
+    bob_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+bob_agent(ch(UserIn, [read(33, Word?)|UserOut?]),
+          ch([msg(From, To, read_word(33))|NetIn], NetOut?)) :-
+    ground(From?), ground(To?), To? =?= bob |
+    read_dream_word(33, Word),
+    bob_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+bob_agent(ch([], []), ch([], [])).
 
 %% === Actors ===
 
@@ -79,10 +101,10 @@ play_read_along :-
              (bob, ch(BobNetOut?, BobNetIn))),
 
     %% Alice's agent
-    agent(alice, ch(AliceUserIn?, AliceUserOut), ch(AliceNetIn?, AliceNetOut)),
+    alice_agent(ch(AliceUserIn?, AliceUserOut), ch(AliceNetIn?, AliceNetOut)),
 
     %% Bob's agent
-    agent(bob, ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
+    bob_agent(ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
 
     %% Actors
     alice_actor(AliceUserOut?, AliceUserIn),
