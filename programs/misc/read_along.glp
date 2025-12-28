@@ -44,59 +44,35 @@ network2((alice, ch(AliceIn, [msg(bob, alice, X?)|AliceOut?])),
              (bob, ch(BobIn?, BobOut))).
 
 %% === Read-Along Agent ===
-%% Alice and Bob agents - each calls read_dream_word to get words
+%% Generic agent for both Alice and Bob
 
-%% === Alice's Agent ===
+%% Send message from user to network
+agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
+           ch(NetIn, [msg(Id?, To?, Content?)|NetOut?])) :-
+    ground(Id?), ground(To?), ground(Content?) |
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-alice_agent(ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
-            ch(NetIn, [msg(alice, To?, Content?)|NetOut?])) :-
-    ground(To?), ground(Content?) |
-    alice_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
-
-alice_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
-            ch([msg(From, To, read_word(I))|NetIn], [msg(alice, From?, read_word(I1?))|NetOut?])) :-
-    ground(From?), ground(To?), ground(I?), To? =?= alice,
+%% Receive read_word(I) - read and send next if I < MaxLen
+agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
+           ch([msg(From, To, read_word(I))|NetIn], [msg(Id?, From?, read_word(I1?))|NetOut?])) :-
+    ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
     max_word_index(MaxLen),
     I? < MaxLen? |
     read_dream_word(I?, Word),
     I1 := I? + 1,
-    alice_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-alice_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
-            ch([msg(From, To, read_word(I))|NetIn], NetOut?)) :-
-    ground(From?), ground(To?), ground(I?), To? =?= alice,
+%% Receive read_word(I) where I = MaxLen - read last word, stop
+agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
+           ch([msg(From, To, read_word(I))|NetIn], NetOut?)) :-
+    ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
     max_word_index(MaxLen),
     I? =:= MaxLen? |
     read_dream_word(I?, Word),
-    alice_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-alice_agent(ch([], []), ch([], [])).
-
-%% === Bob's Agent ===
-
-bob_agent(ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
-          ch(NetIn, [msg(bob, To?, Content?)|NetOut?])) :-
-    ground(To?), ground(Content?) |
-    bob_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
-
-bob_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
-          ch([msg(From, To, read_word(I))|NetIn], [msg(bob, From?, read_word(I1?))|NetOut?])) :-
-    ground(From?), ground(To?), ground(I?), To? =?= bob,
-    max_word_index(MaxLen),
-    I? < MaxLen? |
-    read_dream_word(I?, Word),
-    I1 := I? + 1,
-    bob_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
-
-bob_agent(ch(UserIn, [read(I?, Word?)|UserOut?]),
-          ch([msg(From, To, read_word(I))|NetIn], NetOut?)) :-
-    ground(From?), ground(To?), ground(I?), To? =?= bob,
-    max_word_index(MaxLen),
-    I? =:= MaxLen? |
-    read_dream_word(I?, Word),
-    bob_agent(ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
-
-bob_agent(ch([], []), ch([], [])).
+%% Empty channels - terminate
+agent(_, ch([], []), ch([], [])).
 
 %% === Actors ===
 
@@ -114,10 +90,10 @@ play_read_along :-
              (bob, ch(BobNetOut?, BobNetIn))),
 
     %% Alice's agent
-    alice_agent(ch(AliceUserIn?, AliceUserOut), ch(AliceNetIn?, AliceNetOut)),
+    agent(alice, ch(AliceUserIn?, AliceUserOut), ch(AliceNetIn?, AliceNetOut)),
 
     %% Bob's agent
-    bob_agent(ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
+    agent(bob, ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
 
     %% Actors
     alice_actor(AliceUserOut?, AliceUserIn),
