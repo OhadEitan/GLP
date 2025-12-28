@@ -6,6 +6,32 @@
 read_word(1, [Word|_], Word?).
 read_word(N, [_|Rest], Word?) :- N? > 1 | N1 := N? - 1, read_word(N1?, Rest?, Word).
 
+%% === Dream Speech Stream ===
+
+dream_speech([i, have, a, dream, that, one, day, this, nation, will, rise, up, live,
+               out, the, true, meaning, of, its, creed, we, hold, these, truths, to, be,
+               self_evident, that, all, men, are, created, equal]).
+
+%% List length
+length([], 0).
+length([_|Xs], N?) :- length(Xs?, N1), N := N1? + 1.
+
+%% Identity predicate to consume values
+id(_).
+
+%% Test reading specific words from dream speech
+test_word_1 :- dream_speech(Words), read_word(1, Words?, W), id(W?).
+test_word_5 :- dream_speech(Words), read_word(5, Words?, W), id(W?).
+test_word_10 :- dream_speech(Words), read_word(10, Words?, W), id(W?).
+test_word_20 :- dream_speech(Words), read_word(20, Words?, W), id(W?).
+test_word_32 :- dream_speech(Words), read_word(32, Words?, W), id(W?).
+
+%% Demo: get dream speech length
+demo_length :-
+    dream_speech(Words),
+    length(Words?, Len),
+    id(Len?).
+
 %% === Network switch (2-way) ===
 %% Routes msg(From, To, Content) based on To field
 
