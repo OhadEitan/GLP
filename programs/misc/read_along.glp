@@ -45,8 +45,8 @@ network2((alice, ch(AliceIn, [msg(bob, alice, X?)|AliceOut?])),
     network2((alice, ch(AliceIn?, AliceOut)),
              (bob, ch(BobIn?, BobOut))).
 
-%% === Simple Ping-Pong Agent ===
-%% Process one message at a time using structure patterns in head
+%% === Read-Along Agent ===
+%% Agents take turns reading words from dream speech
 
 %% User sends a message - forward to network
 agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
@@ -54,23 +54,17 @@ agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
     ground(Id?), ground(To?), ground(Content?) |
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-%% Receive ping(N) from network - reply with pong(N)
-agent(Id, ch(UserIn, [received_ping(From?, N?)|UserOut?]),
-          ch([msg(From, To, ping(N))|NetIn], [msg(Id?, From?, pong(N?))|NetOut?])) :-
-    ground(Id?), ground(From?), ground(To?), ground(N?), Id? =?= To? |
+%% Receive read_word(I) - read word I, send read_word(I+1) if I < 33
+agent(Id, ch(UserIn, [read(I?, word)|UserOut?]),
+          ch([msg(From, To, read_word(I))|NetIn], [msg(Id?, From?, read_word(I1?))|NetOut?])) :-
+    ground(Id?), ground(From?), ground(To?), ground(I?),
+    Id? =?= To?, I? < 33 |
+    I1 := I? + 1,
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-%% Receive pong(N) where N > 0 - send another ping(N-1)
-agent(Id, ch(UserIn, [received_pong(From?, N?)|UserOut?]),
-          ch([msg(From, To, pong(N))|NetIn], [msg(Id?, From?, ping(N1?))|NetOut?])) :-
-    ground(Id?), ground(From?), ground(To?), ground(N?),
-    Id? =?= To?, N? > 0 |
-    N1 := N? - 1,
-    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
-
-%% Receive pong(0) - done, no more pings
-agent(Id, ch(UserIn, [received_pong(From?, 0)|UserOut?]),
-          ch([msg(From, To, pong(0))|NetIn], NetOut?)) :-
+%% Receive read_word(33) - read last word, done
+agent(Id, ch(UserIn, [read(33, word)|UserOut?]),
+          ch([msg(From, To, read_word(33))|NetIn], NetOut?)) :-
     ground(Id?), ground(From?), ground(To?), Id? =?= To? |
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
@@ -79,15 +73,15 @@ agent(_, ch([], []), ch([], [])).
 
 %% === Actors ===
 
-%% Alice: sends ping command with counter N
-alice_actor(_, N, [send(bob, ping(N?))]).
+%% Alice: starts read-along by sending read_word(1)
+alice_actor(_, [send(bob, read_word(1))]).
 
 %% Bob: no user input
 bob_actor(_, []).
 
 %% === The Play ===
 
-play_ping_pong(N) :-
+play_read_along :-
     %% Network switch
     network2((alice, ch(AliceNetOut?, AliceNetIn)),
              (bob, ch(BobNetOut?, BobNetIn))),
@@ -99,10 +93,10 @@ play_ping_pong(N) :-
     agent(bob, ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
 
     %% Actors
-    alice_actor(AliceUserOut?, N?, AliceUserIn),
+    alice_actor(AliceUserOut?, AliceUserIn),
     bob_actor(BobUserOut?, BobUserIn).
 
 %% === Demo ===
-%% Run with :trace to see the ping-pong exchange
+%% Run with :trace to see the read-along exchange
 
-demo :- play_ping_pong(3).
+demo :- play_read_along.
