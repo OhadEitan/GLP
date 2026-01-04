@@ -8,7 +8,7 @@ len([_|T], Acc, N?) :- Acc1 := Acc? + 1, len(T?, Acc1?, N).
 
 %% Get length of dream_speech
 speech_len(MaxLenA) :- dream_speech(LA), len(LA?, 0, N).
-speech_len(MaxLenB) :- dream_speech(LB), len(LB?, 0, N).
+
 
 
 % index(I, List, Out) - Get element at index I from List (0-based)
@@ -32,11 +32,10 @@ merge([], [], []).
 chain_demo(Zs?) :-
     gen1(As),           % Producer 1 → As
     gen2(Bs),           % Producer 2 → Bs
-    merge(As?, Bs?, T), % Merge first two into T
+    merge(As?, Bs?, T). % Merge first two into T
 
 
-gen1(Alice_Part?).
-gen2(Bob_Part?).
+gen1(Out1?).
 
 
 %% === Network switch (2-way) ===
@@ -65,20 +64,20 @@ agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
 
 
 %% Receive read and send next if I < MaxLen
-agent(Id, ch(UserIn, [index_to_list(I?, LA, Out1)|UserOut?]),
+agent(Id, ch(UserIn, [index_to_list(I?, LB, Out1)|UserOut?]),
            ch([msg(From, To, I)|NetIn], [msg(Id?, From?, I1?)|NetOut?])) :-
     ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
     I? < MaxLenA? |
-	index_to_list(I, LA, Out1?),
+	index_to_list(I, dream_speech(LB), Out1?),
     I1 := I? + 1,
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Receive when I = MaxLen - read last word, stop
-agent(Id, ch(UserIn, [index_to_list(I, LB, Out2?)|UserOut?]),
+agent(Id, ch(UserIn, [index_to_list(I, LB, Out1?)|UserOut?]),
            ch([msg(From, To, I)|NetIn], NetOut?)) :-
     ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
-    I? =:= MaxLenB? |
-    index_to_list(I?, Out1),
+    I? =:= MaxLenA? |
+	index_to_list(I, dream_speech(LB), Out1?),
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Empty channels - terminate
