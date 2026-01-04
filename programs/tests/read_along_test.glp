@@ -73,11 +73,13 @@ agent(Id, ch(UserIn, [index_to_list(I?, LB, Out1)|UserOut?]),
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Receive when I = MaxLen - read last word, stop
-agent(Id, ch(UserIn, [index_to_list(I, LB, Out1?)|UserOut?]),
+agent(Id, ch(UserIn, [index_to_list(I?, L?, Out1?)|UserOut?]),
            ch([msg(From, To, I)|NetIn], NetOut?)) :-
     ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
     speech_len(MaxLenA), I? =:= MaxLenA? |
-	index_to_list(I, dream_speech(LB), Out1?),
+    dream_speech(L),
+    index_to_list(I?, L?, Out1),
+    gen1(Out1?),
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Empty channels - terminate
