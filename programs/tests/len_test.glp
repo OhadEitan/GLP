@@ -1,0 +1,15 @@
+dream_speech([i, have, a, dream, that, one, day, this, nation, will, rise, up, live,
+               out, the, true, meaning, of, its, creed, we, hold, these, truths, to, be,
+               self_evident, that, all, men, are, created, equal]).
+
+len([], Acc, Acc?).
+len([_|T], Acc, N?) :- Acc1 := Acc? + 1, len(T?, Acc1?, N).
+
+% index(I, List, Out) - Get element at index I from List (0-based)
+index(0, [H|_], H?).
+index(I, [_|T], Out?) :- I? > 0 | I1 := I? - 1, index(I1?, T?, Out).
+
+% Take element at index I from L1, output as single-element list
+index_to_list(I, L1, Out?) :-
+    ground(I?) |
+    index(I?, L1?, X), Out = [X?].

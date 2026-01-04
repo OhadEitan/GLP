@@ -1,0 +1,89 @@
+%% read_along.glp - Read-along with ping-pong agents
+
+dream_speech([i, have, a, dream, that, one, day, this, nation, will, rise, up, live,
+               out, the, true, meaning, of, its, creed, we, hold, these, truths, to, be,
+               self_evident, that, all, men, are, created, equal]).
+
+len([], Acc, Acc?).
+len([_|T], Acc, N?) :- Acc1 := Acc? + 1, len(T?, Acc1?, N).
+
+% index(I, List, Out) - Get element at index I from List (0-based)
+index(0, [H|_], H?).
+index(I, [_|T], Out?) :- I? > 0 | I1 := I? - 1, index(I1?, T?, Out).
+
+%% Merger: interleaves two streams
+merge([X|Xs], Ys, [X?|Zs?]) :- merge(Ys?, Xs?, Zs).
+merge(Xs, [Y|Ys], [Y?|Zs?]) :- merge(Xs?, Ys?, Zs).
+merge([], [], []).
+
+%% === Network switch (2-way) ===
+%% Routes msg(From, To, Content) based on To field
+
+network2((alice, ch([msg(alice, bob, X)|AliceIn], AliceOut?)),
+         (bob, ch(BobIn, [msg(alice, bob, X?)|BobOut?]))) :-
+    network2((alice, ch(AliceIn?, AliceOut)),
+             (bob, ch(BobIn?, BobOut))).
+
+network2((alice, ch(AliceIn, [msg(bob, alice, X?)|AliceOut?])),
+         (bob, ch([msg(bob, alice, X)|BobIn], BobOut?))) :-
+    network2((alice, ch(AliceIn?, AliceOut)),
+             (bob, ch(BobIn?, BobOut))).
+
+%% === Read-Along Agent ===
+%% Generic agent for both Alice and Bob
+
+%% Send message from user to network
+agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
+           ch(NetIn, [msg(Id?, To?, Content?)|NetOut?])) :-
+    ground(Id?), ground(To?), ground(Content?) |
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+%% Receive message - read word at index I and send next if I < 32 (speech has 33 words, indices 0-32)
+agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
+           ch([msg(From, _, I)|NetIn], [msg(Id?, From?, I1?)|NetOut?])) :-
+    ground(Id?), ground(From?), ground(I?),
+    I? < 32 |
+    dream_speech(Speech),
+    index(I?, Speech?, Word),
+    I1 := I? + 1,
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+%% Receive message - read last word (I = 32), stop sending
+agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
+           ch([msg(From, _, I)|NetIn], NetOut?)) :-
+    ground(Id?), ground(From?), ground(I?),
+    I? =:= 32 |
+    dream_speech(Speech),
+    index(I?, Speech?, Word),
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+
+%% Empty channels - terminate
+agent(_, ch([], []), ch([], [])).
+
+%% === Actors ===
+
+%% Alice: starts read-along by sending index 0
+alice_actor(_, [send(bob, 0)]).
+
+%% Bob: no user input
+bob_actor(_, []).
+
+%% === The Play ===
+
+play_read_along :-
+    %% Network switch
+    network2((alice, ch(AliceNetOut?, AliceNetIn)),
+             (bob, ch(BobNetOut?, BobNetIn))),
+
+    %% Alice's agent
+    agent(alice, ch(AliceUserIn?, AliceUserOut), ch(AliceNetIn?, AliceNetOut)),
+
+    %% Bob's agent
+    agent(bob, ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
+
+    %% Actors
+    alice_actor(AliceUserOut?, AliceUserIn),
+    bob_actor(BobUserOut?, BobUserIn).
+
+%% === Demo ===
+demo :- play_read_along.
