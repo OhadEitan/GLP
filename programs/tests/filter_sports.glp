@@ -1,0 +1,19 @@
+%% Sports as facts - return yes/no
+check_sport(tennis, yes).
+check_sport(basketball, yes).
+check_sport(soccer, yes).
+check_sport(_, no) :- otherwise | true.
+
+%% Filter: keep only sports from input list
+filter_sports([], []).
+filter_sports([H|T], Out?) :-
+    ground(H?) |
+    check_sport(H?, R),
+    filter_one(R?, H?, T?, Out).
+
+%% Helper: based on check result, include or skip
+filter_one(yes, H, T, [H?|Rest?]) :- filter_sports(T?, Rest).
+filter_one(no, _, T, Out?) :- filter_sports(T?, Out).
+
+%% Main: get sports from a list
+find_sports(Words, Out?) :- filter_sports(Words?, Out).
