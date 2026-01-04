@@ -32,7 +32,7 @@ merge([], [], []).
 chain_demo(Zs?) :-
     gen1(As),           % Producer 1 → As
     gen2(Bs),           % Producer 2 → Bs
-    merge(As?, Bs?, T). % Merge first two into T
+    merge(As?, Bs?, Zs). % Merge first two into Zs
 
 
 gen1(Out1?).
