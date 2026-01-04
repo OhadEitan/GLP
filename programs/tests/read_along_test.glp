@@ -21,25 +21,23 @@ ground(I?) | index(I?, L1?, X), Out = [X?].
 
 
 % Merger: interleaves two streams
-% When Xs has an element, take it
 merge([X|Xs], Ys, [X?|Zs?]) :- merge(Ys?, Xs?, Zs).
-% When Ys has an element, take it
 merge(Xs, [Y|Ys], [Y?|Zs?]) :- merge(Xs?, Ys?, Zs).
-% Both empty
 merge([], [], []).
 
 % Chained cooperative merge: 3 producers via 2 binary merges
 chain_demo(Zs?) :-
-    gen1(As),           % Producer 1 → As
-    gen2(Bs),           % Producer 2 → Bs
-    merge(As?, Bs?, Zs). % Merge first two into Zs
+    gen1(As),
+    gen2(Bs),
+    merge(As?, Bs?, Zs).
 
 
-gen1(Out1?).
+gen1(OutA?).
+gen1(OutB?).
+
 
 
 %% === Network switch (2-way) ===
-%% Routes msg(From, To, Content) based on To field
 network2((alice, ch([msg(alice, bob, X)|AliceIn], AliceOut?)),
          (bob, ch(BobIn, [msg(alice, bob, X?)|BobOut?]))) :-
     network2((alice, ch(AliceIn?, AliceOut)),
@@ -55,7 +53,6 @@ id(_).
 
 
 %% === Read-Along Agent ===
-%% Generic agent for both Alice and Bob
 %% Send message from user to network
 agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
            ch(NetIn, [msg(Id?, To?, Content?)|NetOut?])) :-
@@ -64,64 +61,39 @@ agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
 
 
 %% Receive read and send next if I < MaxLen
-agent(Id, ch(UserIn, [index_to_list(I?, LB, Out1)|UserOut?]),
+agent(Id, ch(UserIn, I?)|UserOut?]),
            ch([msg(From, To, I)|NetIn], [msg(Id?, From?, I1?)|NetOut?])) :-
     ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
     speech_len(MaxLenA), I? < MaxLenA? |
 	index_to_list(I, dream_speech(LB), Out1?),
     I1 := I? + 1,
+	gen1(OutA),
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Receive when I = MaxLen - read last word, stop
-agent(Id, ch(UserIn, [index_to_list(I?, L?, Out1?)|UserOut?]),
+agent(Id, ch(UserIn, I?|UserOut?]),
            ch([msg(From, To, I)|NetIn], NetOut?)) :-
     ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
     speech_len(MaxLenA), I? =:= MaxLenA? |
-    dream_speech(L),
-    index_to_list(I?, L?, Out1),
-    gen1(Out1?),
+    index_to_list(I?, dream_speech(L), Out1),
+	gen1(OutB)
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
 %% Empty channels - terminate
 agent(_, ch([], []), ch([], [])).
 
 %% === Actors ===
-%% Alice: starts read-along by sending
 alice_actor(_, [send(bob, 1)]).
-
-%% Bob: no user input
 bob_actor(_, []).
 
 
-
 play_read_along :-
-
-    %% Network switch
-
     network2((alice, ch(AliceNetOut?, AliceNetIn)),
-
              (bob, ch(BobNetOut?, BobNetIn))),
-
-
-
-    %% Alice's agent
-
     agent(alice, ch(AliceUserIn?, AliceUserOut), ch(AliceNetIn?, AliceNetOut)),
-
-
-
-    %% Bob's agent
-
     agent(bob, ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut)),
-
-
-
-    %% Actors
-
     alice_actor(AliceUserOut?, AliceUserIn),
-
     bob_actor(BobUserOut?, BobUserIn).
-
 
 %% === Demo ===
 demo :- play_read_along.
