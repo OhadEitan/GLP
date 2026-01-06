@@ -30,9 +30,6 @@ network2((alice, ch(AliceIn, [msg(bob, alice, X?)|AliceOut?])),
     network2((alice, ch(AliceIn?, AliceOut)),
              (bob, ch(BobIn?, BobOut))).
 
-%% Terminate when both done
-network2((alice, ch([], [])), (bob, ch([], []))).
-
 %% === Read-Along Agent ===
 
 %% Send message from user to network
