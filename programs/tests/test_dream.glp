@@ -1,0 +1,18 @@
+dream_speech([i, dont_care1, have, dont_care2]).
+
+agent_input(_, [], []).
+agent_input([I|Input], [Word|Text], Out?) :-
+    I? =?= Word? |
+    agent_output(Input?, Text?, Out).
+
+agent_output(_, [], []).
+agent_output(Input, [Word|Text], [Word?|Out?]) :-
+    agent_input(Input?, Text?, Out).
+
+
+
+test_dream(ResultA?,ResultB?) :-
+    dream_speech(X),
+    agent_input([i, have], X?, ResultA),
+	dream_speech(Y),
+	agent_output([dont_care1, dont_care2], Y?, ResultB).
