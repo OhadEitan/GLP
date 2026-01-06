@@ -1,4 +1,5 @@
 %% read_along.glp - Read-along with ping-pong agents
+%% Bob reads odd words, Alice reads even words
 
 dream_speech([i, have]).
 
@@ -8,20 +9,17 @@ dup(X, Y?, Z?) :- ground(X?) | Y = X?, Z = X?.
 %% Identity predicate to consume values
 id(_).
 
-%% agent_handler
+%% === Ping-pong handlers ===
 agent_input(_, [], []).
-%% Case 1: Input matches Text word - consume both streams
 agent_input([I|Input], [Word|Text], Out?) :-
     I? =?= Word? |
     agent_output(Input?, Text?, Out).
 
-%% Case 2: No match from input - read Text, write to Out
 agent_output(_, [], []).
 agent_output(Input, [Word|Text], [Word?|Out?]) :-
     agent_input(Input?, Text?, Out).
 
 %% === Network switch (2-way) ===
-%% Routes msg(From, To, Content) based on To field
 network2((alice, ch([msg(alice, bob, X)|AliceIn], AliceOut?)),
          (bob, ch(BobIn, [msg(alice, bob, X?)|BobOut?]))) :-
     network2((alice, ch(AliceIn?, AliceOut)),
@@ -32,62 +30,57 @@ network2((alice, ch(AliceIn, [msg(bob, alice, X?)|AliceOut?])),
     network2((alice, ch(AliceIn?, AliceOut)),
              (bob, ch(BobIn?, BobOut))).
 
+%% Terminate when both done
+network2((alice, ch([], [])), (bob, ch([], []))).
+
 %% === Read-Along Agent ===
 
 %% Send message from user to network
 agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
-           ch(NetIn, [msg(Id?, To?, Content?)|NetOut?]), Buf) :-
+           ch(NetIn, [msg(Id?, To?, Content?)|NetOut?]), AgentBuf) :-
     ground(Id?), ground(To?), ground(Content?) |
-    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut), Buf?).
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut), AgentBuf?).
 
-%% Receive
-agent(Id, ch(UserIn, [Content?|UserOut?]),
-           ch([msg(From, To, Content)|NetIn], [msg(Id?, From?, ContentA?)|NetOut?]), Buf) :-
-    ground(Id?), ground(From?), ground(To?), ground(Content?), ground(Buf?), Id? =?= To? |
-    agent_handler(Id?, Content?, Buf?, ContentA, NewBuf),
-    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut), NewBuf?).
+%% Bob receives - process and respond
+agent(bob, ch(UserIn, [Content?|UserOut?]),
+           ch([msg(From, bob, Content)|NetIn], [msg(bob, From?, ContentA?)|NetOut?]), AgentBuf) :-
+    ground(From?), ground(Content?), ground(AgentBuf?) |
+    agent_handler(bob, Content?, AgentBuf?, ContentA),
+    agent(bob, ch(UserIn?, UserOut), ch(NetIn?, NetOut), AgentBuf?).
+
+%% Alice receives - process but DON'T respond (terminates the exchange)
+agent(alice, ch(UserIn, [HandlerOut?|UserOut?]),
+           ch([msg(From, alice, Content)|NetIn], NetOut?), AgentBuf) :-
+    ground(From?), ground(Content?), ground(AgentBuf?) |
+    agent_handler(alice, Content?, AgentBuf?, HandlerOut),
+    NetOut = NetIn?,
+    UserOut = UserIn?.
 
 %% Empty channels - terminate
 agent(_, ch([], []), ch([], []), _).
 
-%% agent_handler: process input, return output and remaining buffer
-agent_handler(bob, In, [Word|Rest], Out?, NewBuf?) :-
-    ground(In?), ground(Word?), ground(Rest?) |
-    agent_input(In?, [Word?|Rest?], Out),
-    NewBuf = Rest?.
+%% Handler implementations
+agent_handler(bob, In, Txt, Out?) :-
+    ground(In?), ground(Txt?) |
+    agent_input(In?, Txt?, Out).
 
-agent_handler(alice, In, [Word|Rest], Out?, NewBuf?) :-
-    ground(In?), ground(Word?), ground(Rest?) |
-    agent_output(In?, [Word?|Rest?], Out),
-    NewBuf = Rest?.
+agent_handler(alice, In, Txt, Out?) :-
+    ground(In?), ground(Txt?) |
+    agent_output(In?, Txt?, Out).
 
 %% === Actors ===
-
-%% Alice: starts
 alice_actor(_, [send(bob, [i])]).
-
-%% Bob: no user input
 bob_actor(_, []).
 
 %% === The Play ===
-
 play_read_along :-
-    %% Network switch
     network2((alice, ch(AliceNetOut?, AliceNetIn)),
              (bob, ch(BobNetOut?, BobNetIn))),
-
     dream_speech(Txt),
     dup(Txt?, AgentBuf1, AgentBuf2),
-
-    %% Alice's agent
     agent(alice, ch(AliceUserIn?, AliceUserOut), ch(AliceNetIn?, AliceNetOut), AgentBuf1?),
-
-    %% Bob's agent
     agent(bob, ch(BobUserIn?, BobUserOut), ch(BobNetIn?, BobNetOut), AgentBuf2?),
-
-    %% Actors
     alice_actor(AliceUserOut?, AliceUserIn),
     bob_actor(BobUserOut?, BobUserIn).
 
-%% === Demo ===
 demo :- play_read_along.
