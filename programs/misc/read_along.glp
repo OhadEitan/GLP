@@ -1,31 +1,11 @@
 %% read_along.glp - Read-along with ping-pong agents
-
-%% === Read Word Predicate ===
-%% Reads the Nth word from a list (1-indexed)
-
-read_word(1, [Word|_], Word?).
-read_word(N, [_|Rest], Word?) :- N? > 1 | N1 := N? - 1, read_word(N1?, Rest?, Word).
-
-%% Helper: Read word I from dream speech
-%% This avoids SRSW violations by encapsulating dream_speech call
-read_dream_word(I, Word) :-
-    dream_speech(WordList),
-    read_word(I?, WordList?, Word?).
-
-%% Maximum word index - computed from dream_speech length
-%% This is derived from the 33 words in dream_speech
-%% Change dream_speech => update this value
-max_word_index(33).
+%% Messages carry remaining text - no index needed
 
 %% === Dream Speech Stream ===
 
 dream_speech([i, have, a, dream, that, one, day, this, nation, will, rise, up, live,
                out, the, true, meaning, of, its, creed, we, hold, these, truths, to, be,
                self_evident, that, all, men, are, created, equal]).
-
-%% List length
-length([], 0).
-length([_|Xs], N?) :- length(Xs?, N1), N := N1? + 1.
 
 %% Identity predicate to consume values
 id(_).
@@ -43,6 +23,9 @@ network2((alice, ch(AliceIn, [msg(bob, alice, X?)|AliceOut?])),
     network2((alice, ch(AliceIn?, AliceOut)),
              (bob, ch(BobIn?, BobOut))).
 
+%% Network terminates when both outputs are closed
+network2((alice, ch([], [])), (bob, ch([], []))).
+
 %% === Read-Along Agent ===
 %% Generic agent for both Alice and Bob
 
@@ -52,32 +35,30 @@ agent(Id, ch([send(To, Content)|UserIn], [sent(To?, Content?)|UserOut?]),
     ground(Id?), ground(To?), ground(Content?) |
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-%% Receive read_word(I) - read and send next if I < MaxLen
-agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
-           ch([msg(From, To, read_word(I))|NetIn], [msg(Id?, From?, read_word(I1?))|NetOut?])) :-
-    ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
-    max_word_index(MaxLen),
-    I? < MaxLen? |
-    read_dream_word(I?, Word),
-    I1 := I? + 1,
+%% Receive read([Word, Next|Rest]) - 2+ words remaining
+%% Read Word, send [Next|Rest] back
+agent(Id, ch(UserIn, [read(Word?)|UserOut?]),
+           ch([msg(From, To, read([Word, Next|Rest]))|NetIn],
+              [msg(Id?, From?, read([Next?|Rest?]))|NetOut?])) :-
+    ground(Id?), ground(From?), ground(To?), ground(Word?), ground(Next?), Id? =?= To? |
     agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
 
-%% Receive read_word(I) where I = MaxLen - read last word, stop
-agent(Id, ch(UserIn, [read(I?, Word?)|UserOut?]),
-           ch([msg(From, To, read_word(I))|NetIn], NetOut?)) :-
-    ground(Id?), ground(From?), ground(To?), ground(I?), Id? =?= To?,
-    max_word_index(MaxLen),
-    I? =:= MaxLen? |
-    read_dream_word(I?, Word),
-    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, NetOut)).
+%% Receive read([Word]) - last word, send done and close output
+agent(Id, ch(UserIn, [read(Word?)|UserOut?]),
+           ch([msg(From, To, read([Word]))|NetIn], [msg(Id?, From?, done)])) :-
+    ground(Id?), ground(From?), ground(To?), ground(Word?), Id? =?= To? |
+    agent(Id?, ch(UserIn?, UserOut), ch(NetIn?, [])).
+
+%% Receive done - terminate (network routing ensures correct delivery)
+agent(_, ch(_, _), ch([msg(_, _, done)|_], [])).
 
 %% Empty channels - terminate
 agent(_, ch([], []), ch([], [])).
 
 %% === Actors ===
 
-%% Alice: starts read-along by sending read_word(1)
-alice_actor(_, [send(bob, read_word(1))]).
+%% Alice: starts read-along by sending full dream speech
+alice_actor(_, [send(bob, read(Text?))]) :- dream_speech(Text).
 
 %% Bob: no user input
 bob_actor(_, []).
