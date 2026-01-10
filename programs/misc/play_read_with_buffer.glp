@@ -1,0 +1,93 @@
+%% Shared text buffer
+text_buffer([once, upon, a, time, there, lived, in, a, certain, village, a,
+ little, country, girl, the, prettiest, creature, who, was, ever, seen,
+ her, mother, was, excessively, fond, of, her, and, her, grandmother, doted, on, her, still,
+ more, everybody, called, her, little, red, riding, hood, one, day, her, mother, said, to, her]).
+
+%% Helper to duplicate
+dup(X, Y?, Z?) :- ground(X?) | Y = X?, Z = X?.
+
+%% === Network switch (2-way) ===
+network2((alice, ch([alice, bob, Content|AliceIn], AliceOut?)),
+         (bob, ch(BobIn, [alice, bob, Content?|BobOut?]))) :-
+    network2((alice, ch(AliceIn?, AliceOut)),
+             (bob, ch(BobIn?, BobOut))).
+
+network2((alice, ch(AliceIn, [bob, alice, Content?|AliceOut?])),
+         (bob, ch([bob, alice, Content|BobIn], BobOut?))) :-
+    network2((alice, ch(AliceIn?, AliceOut)),
+             (bob, ch(BobIn?, BobOut))).
+ 
+%% termination
+network2((alice, ch([], [])), (bob, ch([], []))).
+ 
+%% === Alice handler ===
+%% Alice takes 1st element, skips 2nd, continues with rest
+alice_handler([Word, _ | Text], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    alice_recv(Text?, NetIn?, NetOut, Log).
+ 
+%% Alice takes last element (odd length)
+alice_handler([Word], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    alice_recv([], NetIn?, NetOut, Log).
+
+%%termination
+alice_handler([], _, [], []).
+
+%% Alice waits for Bob's response, then continues
+alice_recv(Text, NetIn, NetOut?, Log?) :-
+    list(NetIn?), list(Text?) |
+    alice_recv_match(Text?, NetIn?, NetOut, Log).
+
+%%termination
+alice_recv([], _, [], []).
+
+%%suspend until bob send his msg  
+alice_recv_match([Word, _ | Text], [bob, alice, _|NetIn], [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    alice_recv(Text?, NetIn?, NetOut, Log).
+
+%%handle the last word 
+alice_recv_match([Word], [bob, alice, _|NetIn], [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    alice_recv([], NetIn?, NetOut, Log).
+
+%%termination
+alice_recv_match([], _, [], []).
+
+ 
+
+%% === Bob handler ===
+%% Bob waits for message, then takes 2nd element (skips 1st), continues
+bob_handler(Text, NetIn, NetOut?, Log?) :-
+    list(NetIn?), list(Text?) |
+    bob_match(Text?, NetIn?, NetOut, Log).
+
+%% bob is not starting thats why he has one less clause.
+
+bob_handler([], _, [], []). ([], _, [], []).
+ 
+%% Bob skips 1st, takes 2nd
+bob_match([_, Word | Text], [alice, bob, _|NetIn], [bob, alice, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    bob_handler(Text?, NetIn?, NetOut, Log).
+
+%% Bob has only 1 element left - skip it (nothing to take)
+bob_match([_], [alice, bob, _|_], NetOut?, Log?) :-
+    NetOut = [], Log = [].
+
+bob_match([], _, [], []).
+
+%% === Play ===
+play_counting(OutAlice?, OutBob?) :-
+    text_buffer(Txt),
+
+    dup(Txt?, AliceText, BobText),
+
+    network2((alice, ch(AliceNetOut?, AliceNetIn)),
+             (bob, ch(BobNetOut?, BobNetIn))),
+    alice_handler(AliceText?, AliceNetIn?, AliceNetOut, OutAlice),
+    bob_handler(BobText?, BobNetIn?, BobNetOut, OutBob).
+
+demo :- play_counting(_, _).
