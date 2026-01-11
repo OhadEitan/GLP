@@ -17,35 +17,30 @@ network2((alice, ch(AliceIn, [bob, alice, Content?|AliceOut?])),
 
 network2((alice, ch([], [])), (bob, ch([], []))).
 
-%% === Alice handler ===
-%% Alice takes 1st element, skips 2nd, continues with rest
+%% === Alice (2 predicates) ===
+%% alice_handler: Send first word, then continue
+%% alice_continue: Wait for Bob's reply, send next word, loop
+
 alice_handler([Word, _ | Text], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
     ground(Word?) |
-    alice_recv(Text?, NetIn?, NetOut, Log).
+    alice_continue(Text?, NetIn?, NetOut, Log).
 
-%% Alice takes last element (odd length)
 alice_handler([Word], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
     ground(Word?) |
-    alice_recv([], NetIn?, NetOut, Log).
+    alice_continue([], NetIn?, NetOut, Log).
 
 alice_handler([], _, [], []).
 
-%% Alice waits for Bob's response, then continues
-alice_recv(Text, NetIn, NetOut?, Log?) :-
-    list(NetIn?), list(Text?) |
-    alice_recv_match(Text?, NetIn?, NetOut, Log).
+%% Wait for Bob's reply (guard suspends until NetIn is bound), send next, loop
+alice_continue([Word, _ | Text], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    NetIn? = [bob, alice, _|NetInRest], ground(Word?) |
+    alice_continue(Text?, NetInRest?, NetOut, Log).
 
-alice_recv([], _, [], []).
+alice_continue([Word], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    NetIn? = [bob, alice, _|NetInRest], ground(Word?) |
+    alice_continue([], NetInRest?, NetOut, Log).
 
-alice_recv_match([Word, _ | Text], [bob, alice, _|NetIn], [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
-    ground(Word?) |
-    alice_recv(Text?, NetIn?, NetOut, Log).
-
-alice_recv_match([Word], [bob, alice, _|NetIn], [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
-    ground(Word?) |
-    alice_recv([], NetIn?, NetOut, Log).
-
-alice_recv_match([], _, [], []).
+alice_continue([], _, [], []).
 
 %% === Bob handler ===
 %% Bob waits for message, then takes 2nd element (skips 1st), continues
