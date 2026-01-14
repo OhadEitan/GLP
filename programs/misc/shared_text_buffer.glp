@@ -52,6 +52,11 @@ agent_send([Word, _ | Text], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :
     ground(Word?), otherwise |
     agent_wait(Text?, NetIn?, NetOut, Log).
 
+%% Alice last word (single element left)
+agent_send([Word], _, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?), otherwise |
+    NetOut = [], Log = [].
+
 %% Termination
 agent_send([], _, [], []).
 
