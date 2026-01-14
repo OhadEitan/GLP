@@ -1,10 +1,10 @@
-%% Shared text buffer - Alice and Bob use same clause names
+%% Shared text buffer - Alice and Bob use same clause names (no Id in send/wait)
 
 %% Shared text buffer
 text_buffer([once, upon, a, time, there, lived, in, a, certain, village, a,
- little, country, girl, the, prettiest, creature, who, was, ever, seen,
- her, mother, was, excessively, fond, of, her, and, her, grandmother, doted, on, her, still,
- more, everybody, called, her, little, red, riding, hood, one, day]).
+	little, country, girl, the, prettiest, creature, who, was, ever, seen,
+	her, mother, was, excessively, fond, of, her, and, her, grandmother, doted, on, her, still,
+	more, everybody, called, her, little, red, riding, hood, one, day]).
 
 %% Helper to duplicate a list
 dup(X, Y?, Z?) :- ground(X?) | Y = X?, Z = X?.
@@ -23,59 +23,61 @@ network2((alice, ch(AliceIn, [bob, alice, Content?|AliceOut?])),
 %% Termination
 network2((alice, ch([], [])), (bob, ch([], []))).
 
-%% === Unified Agent Handler ===
-%% Dispatches to agent behavior based on Id
-%% Alice starts sending, Bob starts waiting
+%% === Agent Handler ===
+%% Dispatches based on Id - Alice starts sending, Bob starts waiting
 
 agent_handler(Id, Text, NetIn, NetOut?, Log?) :-
     Id? =?= alice |
-    agent_send(Id?, Text?, NetIn?, NetOut, Log).
+    agent_send(Text?, NetIn?, NetOut, Log).
 
 agent_handler(Id, Text, NetIn, NetOut?, Log?) :-
     Id? =?= bob |
-    agent_wait(Id?, Text?, NetIn?, NetOut, Log).
+    agent_wait(Text?, NetIn?, NetOut, Log).
 
 %% === Agent Send ===
-%% Takes 1st element, skips 2nd, sends to partner
+%% Message patterns differentiate Alice vs Bob (no Id needed)
 
-%% Alice sends: take 1st word, skip 2nd, send to bob
-agent_send(Id, [Word, _ | Text], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
-    Id? =?= alice, ground(Word?) |
-    agent_wait(Id?, Text?, NetIn?, NetOut, Log).
+%% Alice continues: received [bob, alice, _], now send next
+agent_send([Word, _ | Text], [bob, alice, _|NetIn], [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    agent_wait(Text?, NetIn?, NetOut, Log).
 
-%% Alice sends: take last word (odd length)
-agent_send(Id, [Word], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
-    Id? =?= alice, ground(Word?) |
-    agent_wait(Id?, [], NetIn?, NetOut, Log).
+%% Alice continues: last word after receiving bob's message
+agent_send([Word], [bob, alice, _|NetIn], [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    agent_wait([], NetIn?, NetOut, Log).
 
-%% Bob sends: skip 1st, take 2nd, send to alice
-agent_send(Id, [_, Word | Text], [alice, bob, _|NetIn], [bob, alice, Word?|NetOut?], [Word?|Log?]) :-
-    Id? =?= bob, ground(Word?) |
-    agent_wait(Id?, Text?, NetIn?, NetOut, Log).
+%% Bob sends: received [alice, bob, _], skip 1st, take 2nd
+agent_send([_, Word | Text], [alice, bob, _|NetIn], [bob, alice, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    agent_wait(Text?, NetIn?, NetOut, Log).
 
 %% Bob sends: only 1 element left - skip it, done
-agent_send(Id, [_], [alice, bob, _|_], NetOut?, Log?) :-
-    Id? =?= bob |
+agent_send([_], [alice, bob, _|_], NetOut?, Log?) :-
     NetOut = [], Log = [].
 
+%% Alice's FIRST send: take 1st word, skip 2nd (otherwise = NetIn not yet a message)
+agent_send([Word, _ | Text], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?), otherwise |
+    agent_wait(Text?, NetIn?, NetOut, Log).
+
+%% Alice's FIRST send: last word (odd length)
+agent_send([Word], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?), otherwise |
+    agent_wait([], NetIn?, NetOut, Log).
+
 %% Termination
-agent_send(_, [], _, [], []).
+agent_send([], _, [], []).
 
 %% === Agent Wait ===
-%% Waits for message from partner, then continues
+%% Waits for message from partner, then calls send (no Id needed)
 
-%% Alice waits for Bob's response, then sends again
-agent_wait(Id, Text, NetIn, NetOut?, Log?) :-
-    Id? =?= alice, list(NetIn?), list(Text?) |
-    agent_send(Id?, Text?, NetIn?, NetOut, Log).
+agent_wait(Text, NetIn, NetOut?, Log?) :-
+    list(NetIn?), list(Text?) |
+    agent_send(Text?, NetIn?, NetOut, Log).
 
-%% Bob waits for Alice's message, then sends
-agent_wait(Id, Text, NetIn, NetOut?, Log?) :-
-    Id? =?= bob, list(NetIn?), list(Text?) |
-    agent_send(Id?, Text?, NetIn?, NetOut, Log).
-
-%% Termination for wait
-agent_wait(_, [], _, [], []).
+%% Termination
+agent_wait([], _, [], []).
 
 %% === Play ===
 play_counting(OutAlice?, OutBob?) :-
