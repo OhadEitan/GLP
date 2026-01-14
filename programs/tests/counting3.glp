@@ -1,0 +1,55 @@
+%% Read-along: Alice reads odd words, Bob reads even words
+%% agent_handler dispatches by ID, agent_send/agent_wait are generic
+
+%% Shared text buffer
+text_buffer([once, upon, a, time, there, lived, in, a, certain, village, a,
+	little, country, girl, the, prettiest, creature, who, was, ever, seen,
+	her, mother, was, excessively, fond, of, her, and, her, grandmother, doted, on, her, still,
+	more, everybody, called, her, little, red, riding, hood, one, day]).
+
+%% Duplicate list helper
+dup(X, Y?, Z?) :- ground(X?) | Y = X?, Z = X?.
+
+%% === Agent Handler - dispatches by ID ===
+%% Alice starts sending (seeded with initial ack)
+agent_handler(Id, Text, In, Out?, Log?) :-
+    Id? =?= alice |
+    agent_send(Text?, [ack|In?], Out, Log).
+
+%% Bob starts waiting
+agent_handler(Id, Text, In, Out?, Log?) :-
+    Id? =?= bob |
+    agent_wait(Text?, In?, Out, Log).
+
+%% === Generic agent_send: take 1st word, skip 2nd ===
+agent_send([W, _ | Ws], [_|In], [W?|Out?], [W?|Log?]) :-
+    ground(W?) |
+    agent_wait(Ws?, In?, Out, Log).
+
+%% Last word (odd-length list)
+agent_send([W], [_|_], Out?, Log?) :-
+    ground(W?) |
+    Out = [W?], Log = [W?].
+
+%% Done
+agent_send([], _, [], []).
+
+%% === Generic agent_wait: skip 1st word, take 2nd ===
+agent_wait([_, W | Ws], [_|In], [W?|Out?], [W?|Log?]) :-
+    ground(W?) |
+    agent_send(Ws?, In?, Out, Log).
+
+%% Last word to skip (even-length list)
+agent_wait([_], [_|_], [], []).
+
+%% Done
+agent_wait([], _, [], []).
+
+%% === Play ===
+play(LogAlice?, LogBob?) :-
+    text_buffer(Txt),
+    dup(Txt?, TextA, TextB),
+    agent_handler(alice, TextA?, FromBob?, ToBob, LogAlice),
+    agent_handler(bob, TextB?, ToBob?, FromBob, LogBob).
+
+demo :- play(_, _).
