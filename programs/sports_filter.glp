@@ -1,0 +1,35 @@
+%% Types:
+Decision ::= yes ; no.
+SportList ::= [] ; [Constant | SportList].
+InputList ::= [] ; [Constant | InputList].
+
+procedure sports(SportList).
+procedure is_in_list(Constant?, SportList?, Decision).
+procedure filter_sports(InputList?, SportList?, SportList).
+procedure filter_result(Decision?, Constant?, InputList?, SportList?, SportList).
+procedure find_sports(InputList?, SportList).
+
+
+%% Facts
+sports([tennis, basketball, soccer]).
+
+%% is_in_list(Item, List, Result) - Result is 'yes' if found, 'no' otherwise
+is_in_list(_, [], no).
+is_in_list(X, [Y|_], yes) :- X? =?= Y? | true.
+is_in_list(X, [_|Ys], Out?) :- otherwise | is_in_list(X?, Ys?, Out).
+
+%% Filter: keep only sports from input list
+filter_sports([], _, []).
+filter_sports([H|T], Sports, Out?) :-
+    ground(Sports?), ground(H?) |
+    is_in_list(H?, Sports?, R),
+    filter_result(R?, H?, T?, Sports?, Out).
+
+filter_result(yes, H, T, Sports, [H?|Rest?]) :- filter_sports(T?, Sports?, Rest).
+filter_result(no, _, T, Sports, Out?) :- filter_sports(T?, Sports?, Out).
+
+
+%% Main: get sports from a list
+find_sports(Words, Out?) :-
+    sports(S),
+    filter_sports(Words?, S?, Out).
