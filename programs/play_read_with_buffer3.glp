@@ -1,0 +1,107 @@
+%% Types Declartion:
+Text ::= [] ; [Constant | Text].
+Log ::= [] ; [Constant | Log].
+Id ::= Constant.
+AgentChIn ::= [] ; [Constant | AgentChIn].
+AgentChOut ::= [] ; [Constant | AgentChOut].
+AgentNetIn ::= [] ; [Constant | AgentNetIn].
+AgentNetOut ::= [] ; [Constant | AgentNetOut].
+
+
+%% Clause Procedure Declartion:
+procedure text_buffer(Text).
+procedure network2(Id?, ch(AgentChIn?, AgentChOut), Id?, ch(AgentChIn, AgentChOut?)).
+procedure agent_handler(Id?, Text?, AgentNetIn?, AgentNetOut, Log).
+procedure agent_send(Text?, AgentNetIn?, AgentNetOut, Log).
+procedure agent_wait(Text?, AgentNetIn?, AgentNetOut, Log).
+%%procedure play_counting(Log, Log).
+procedure list(Text?).
+procedure list(AgentNetIn?).
+procedure =(AgentNetOut, AgentNetOut?).
+procedure =(Log, Log?).
+
+
+
+
+%% Shared text buffer - Alice and Bob use same clause names
+%% Shared text buffer
+text_buffer([once, upon, a, time, there, lived, in, a, certain, village, a,
+	little, country, girl, the, prettiest, creature, who, was, ever, seen,
+	her, mother, was, excessively, fond, of, her, and, her, grandmother, doted, on, her, still,
+	more, everybody, called, her, little, red, riding, hood, one, day]).
+
+%%text_buffer([once]).
+%%text_buffer([1,2]).
+%%text_buffer([1,2,3]).
+
+%% === Network switch (2-way) ===
+network2((alice, ch([alice, bob, Content|AliceIn], AliceOut?)),
+         (bob, ch(BobIn, [alice, bob, Content?|BobOut?]))) :-
+    network2((alice, ch(AliceIn?, AliceOut)),
+             (bob, ch(BobIn?, BobOut))).
+
+network2((alice, ch(AliceIn, [bob, alice, Content?|AliceOut?])),
+         (bob, ch([bob, alice, Content|BobIn], BobOut?))) :-
+    network2((alice, ch(AliceIn?, AliceOut)),
+             (bob, ch(BobIn?, BobOut))).
+
+%% Termination
+network2((alice, ch([], [])), (bob, ch([], []))).
+
+%% === Agent Handler ===
+%% Dispatches based on Id - Alice starts sending, Bob starts waiting
+
+agent_handler(Id, Text, NetIn, NetOut?, Log?) :-
+    Id? =?= alice |
+    agent_send(Text?, NetIn?, NetOut, Log).
+
+agent_handler(Id, Text, NetIn, NetOut?, Log?) :-
+    Id? =?= bob |
+    agent_wait(Text?, NetIn?, NetOut, Log).
+
+%% === Agents Send ===
+%% Alice continues: received [bob, alice, _], send next
+agent_send([Word, _ | Text], [bob, alice, _|NetIn], [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    agent_wait(Text?, NetIn?, NetOut, Log).
+
+%% Bob: received [alice, bob, _], skip 1st, take 2nd
+agent_send([_, Word | Text], [alice, bob, _|NetIn], [bob, alice, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?) |
+    agent_wait(Text?, NetIn?, NetOut, Log).
+
+%% Bob: only 1 element left - done
+agent_send([_], [alice, bob, _|_], [], []).
+
+%% Alice first send (otherwise = NetIn not yet a message)
+agent_send([Word, _ | Text], NetIn, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?), otherwise |
+    agent_wait(Text?, NetIn?, NetOut, Log).
+
+%% Alice last word (single element left)
+agent_send([Word], _, [alice, bob, Word?|NetOut?], [Word?|Log?]) :-
+    ground(Word?), otherwise |
+    NetOut = [], Log = [].
+
+%% Termination
+agent_send([], _, [], []).
+
+%% === Agents Wait ===
+%% Waits for message from partner, then calls send
+agent_wait(Text, NetIn, NetOut?, Log?) :-
+    list(NetIn?), list(Text?) |
+    agent_send(Text?, NetIn?, NetOut, Log).
+
+%% Termination
+agent_wait([], _, [], []).
+
+%% === Play ===
+play_counting(OutAlice?, OutBob?) :-
+	text_buffer(TxtA),
+	text_buffer(TxtB),
+    network2((alice, ch(AliceNetOut?, AliceNetIn)),
+             (bob, ch(BobNetOut?, BobNetIn))),
+    agent_handler(alice, TxtA?, AliceNetIn?, AliceNetOut, OutAlice),
+    agent_handler(bob, TxtB?, BobNetIn?, BobNetOut, OutBob).
+
+demo :- play_counting(_, _).
