@@ -1,0 +1,141 @@
+Sports Filter Type Declaration Analysis
+=======================================
+
+This document explains why one set of type/procedure declarations works
+while another doesn't, even with identical clause implementations.
+
+
+NON-WORKING VERSION
+-------------------
+
+%% Types:
+Decision ::= yes ; no.
+Item ::= _ ; Constant.
+SportList ::= [] ; [Constant | SportList].
+
+procedure sports(SportList).
+procedure is_in_list(Item?, SportList?, Decision).
+procedure filter_sports(SportList?, SportList?, SportList).
+procedure filter_result(Decision?, Item?, SportList?, SportList?, SportList).
+procedure find_sports(SportList?, SportList).
+
+
+WORKING VERSION
+---------------
+
+%% Types:
+Decision ::= yes ; no.
+SportList ::= [] ; [Constant | SportList].
+InputList ::= [] ; [Constant | InputList].
+
+procedure sports(SportList).
+procedure is_in_list(Constant?, SportList?, Decision).
+procedure filter_sports(InputList?, SportList?, SportList).
+procedure filter_result(Decision?, Constant?, InputList?, SportList?, SportList).
+procedure find_sports(InputList?, SportList).
+
+
+KEY DIFFERENCES
+===============
+
+1. ITEM TYPE REMOVED
+--------------------
+Non-working:  Item ::= _ ; Constant.
+Working:      (no Item type)
+
+The union type `Item ::= _ ; Constant` is problematic because:
+- `_` (anonymous variable) is a special GLP construct for "don't care" values
+- It's not meant to be used as a type alternative in unions
+- The type checker treats `_` specially and it doesn't behave like a normal type
+
+
+2. ELEMENT TYPE: Item? vs Constant?
+-----------------------------------
+Non-working:  procedure is_in_list(Item?, SportList?, Decision).
+Working:      procedure is_in_list(Constant?, SportList?, Decision).
+
+Non-working:  procedure filter_result(Decision?, Item?, SportList?, SportList?, SportList).
+Working:      procedure filter_result(Decision?, Constant?, InputList?, SportList?, SportList).
+
+Why this matters - consider the clause:
+    filter_result(yes, H, T, Sports, [H?|Rest?]) :- filter_sports(T?, Sports?, Rest).
+
+- H is a writer in head position 1 (receives input)
+- H? is a reader in the output list [H?|Rest?]
+- The output list is SportList which has element type Constant
+- So H gets inferred as Constant (from the list structure)
+- But procedure declares position 1 as Item?
+- Type mismatch: H is Constant, but H? expects Item?
+
+The type checker requires exact type matching between:
+- The writer (H) inferred from usage
+- The reader (H?) expected from declaration
+
+
+3. INPUT LIST TYPE: SportList? vs InputList?
+--------------------------------------------
+Non-working:  procedure filter_sports(SportList?, SportList?, SportList).
+Working:      procedure filter_sports(InputList?, SportList?, SportList).
+
+Non-working:  procedure filter_result(Decision?, Item?, SportList?, SportList?, SportList).
+Working:      procedure filter_result(Decision?, Constant?, InputList?, SportList?, SportList).
+
+Why separate InputList and SportList:
+- Both have the same structure: [] ; [Constant | List]
+- But semantically they serve different purposes
+- InputList: the mixed list we're filtering (may contain non-sports)
+- SportList: the reference list of valid sports, and the output
+
+Using the same type for both creates ambiguity in the type checker
+when validating bidirectional data flow.
+
+
+ERROR MESSAGES EXPLAINED
+========================
+
+Error 1: "Variable mode mismatch: reader requires ↓ (consume), got ↑ (produce)"
+Path: (R?, 0, output)
+
+This occurs in:
+    filter_result(R?, H?, T?, Sports?, Out)
+
+The type checker sees R? at position 0 which is declared as Decision?.
+But the flow analysis shows "output" direction where "input" is expected.
+This relates to how the Item? type confuses the bidirectional typing.
+
+
+Error 2: "Variable pair (H, H?) not complementary"
+writer=(Constant, ↑), reader=(Item?, ↓)
+
+This is the core issue:
+- H (writer) is inferred as Constant from its use in [H?|Rest?]
+- H? (reader) is expected to be Item? from the procedure declaration
+- Constant ≠ Item? (even though Constant is part of Item)
+- The type system requires exact matches, not subtype relationships
+
+
+SOLUTION PRINCIPLES
+===================
+
+1. Don't use `_` in type unions - it's a special construct, not a type
+
+2. Use exact types that match how variables are used in clauses:
+   - If a variable ends up in a [Constant|...] list, type it as Constant
+   - Don't use union types (Item) when the specific type (Constant) is known
+
+3. Use distinct type names for semantically different roles:
+   - InputList for input data
+   - SportList for the sports reference and output
+   - Even if structurally identical, separate names aid type checking
+
+4. Match procedure declarations to actual clause variable usage:
+   - If clause uses H in a Constant context, declare as Constant?
+   - Don't abstract to Item? when Constant? is what's actually used
+
+
+GENERAL RULE
+============
+
+In GLP type checking, precision beats abstraction.
+Use the most specific type that matches actual usage in clauses.
+Avoid union types unless genuinely needed for multiple concrete alternatives.
